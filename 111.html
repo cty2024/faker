@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>智能座位编排系统</title>
+    <style>
+        body {
+            font-family: '微软雅黑', Arial, sans-serif;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+        #inputArea {
+            width: 300px;
+        }
+        #studentList {
+            width: 100%;
+            height: 300px;
+            margin-bottom: 10px;
+        }
+        #classroom {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background: #fff;
+            border: 1px solid #ccc;
+        }
+        .platform {
+            width: 100%;
+            height: 60px;
+            background: #607D8B;
+            color: white;
+            text-align: center;
+            line-height: 60px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .seat {
+            position: absolute;
+            width: 80px;
+            height: 40px;
+            background: #E1F5FE;
+            border: 1px solid #90CAF9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: move;
+            user-select: none;
+            transition: all 0.3s;
+        }
+        .aisle {
+            background: #f0f0f0;
+        }
+        button {
+            padding: 8px 16px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="inputArea">
+            <h3>学生名单输入：</h3>
+            <textarea id="studentList" placeholder="请输入学生姓名，每行一个"></textarea>
+            <button onclick="generateSeats()">生成座位表</button>
+        </div>
+        <div id="classroom">
+            <div class="platform">讲 台</div>
+        </div>
+    </div>
+
+    <script>
+        let seats = [];
+        let draggedSeat = null;
+        let offsetX = 0, offsetY = 0;
+
+        function generateSeats() {
+            // 清空现有座位
+            seats = [];
+            document.querySelectorAll('.seat').forEach(s => s.remove());
+
+            // 获取学生名单
+            const students = document.getElementById('studentList').value
+                .split('\n')
+                .map(s => s.trim())
+                .filter(s => s);
+            
+            if(students.length === 0) {
+                alert("请输入学生名单");
+                return;
+            }
+
+            // 打乱顺序
+            const shuffled = [...students].sort(() => Math.random() - 0.5);
+
+            // 生成座位坐标
+            const seatWidth = 80;
+            const seatHeight = 40;
+            const aisleWidth = 40;
+            const startY = 80;
+            const rows = Math.ceil(shuffled.length / 8);
+
+            // 创建座位
+            shuffled.forEach((student, index) => {
+                const row = Math.floor(index / 8);
+                const group = Math.floor((index % 8) / 2);
+                const colInGroup = index % 2;
+                
+                let x = group * (2*seatWidth + aisleWidth) + colInGroup*seatWidth;
+                const y = startY + row*seatHeight;
+
+                const seat = document.createElement('div');
+                seat.className = 'seat';
+                seat.textContent = student;
+                seat.style.left = x + 'px';
+                seat.style.top = y + 'px';
+                
+                // 保存初始位置
+                seat.dataset.origX = x;
+                seat.dataset.origY = y;
+
+                // 添加事件监听
+                seat.addEventListener('mousedown', startDrag);
+                
+                document.getElementById('classroom').appendChild(seat);
+                seats.push(seat);
+            });
+        }
+
+        function startDrag(e) {
+            draggedSeat = e.target;
+            const rect = draggedSeat.getBoundingClientRect();
+            offsetX = e.clientX - rect.left;
+            offsetY = e.clientY - rect.top;
+            
+            document.addEventListener('mousemove', doDrag);
+            document.addEventListener('mouseup', stopDrag);
+        }
+
+        function doDrag(e) {
+            if(!draggedSeat) return;
+            
+            const classroom = document.getElementById('classroom');
+            const rect = classroom.getBoundingClientRect();
+            
+            let x = e.clientX - rect.left - offsetX;
+            let y = e.clientY - rect.top - offsetY;
+            
+            // 限制移动范围
+            x = Math.max(0, Math.min(x, classroom.offsetWidth - draggedSeat.offsetWidth));
+            y = Math.max(80, Math.min(y, classroom.offsetHeight - draggedSeat.offsetHeight));
+            
+            draggedSeat.style.left = x + 'px';
+            draggedSeat.style.top = y + 'px';
+        }
+
+        function stopDrag() {
+            if(!draggedSeat) return;
+            
+            // 寻找最近的有效座位
+            const target = findNearestSeat(draggedSeat);
+            
+            if(target && target !== draggedSeat) {
+                // 交换文本内容
+                const temp = draggedSeat.textContent;
+                draggedSeat.textContent = target.textContent;
+                target.textContent = temp;
+            }
+            
+            // 恢复原始位置
+            draggedSeat.style.left = draggedSeat.dataset.origX + 'px';
+            draggedSeat.style.top = draggedSeat.dataset.origY + 'px';
+            
+            // 清理事件监听
+            document.removeEventListener('mousemove', doDrag);
+            document.removeEventListener('mouseup', stopDrag);
+            draggedSeat = null;
+        }
+
+        function findNearestSeat(seat) {
+            const seatRect = seat.getBoundingClientRect();
+            return seats.find(other => {
+                if(other === seat) return false;
+                const otherRect = other.getBoundingClientRect();
+                return (
+                    Math.abs(seatRect.left - otherRect.left) < otherRect.width/2 &&
+                    Math.abs(seatRect.top - otherRect.top) < otherRect.height/2
+                );
+            });
+        }
+    </script>
+</body>
+</html>
